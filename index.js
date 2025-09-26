@@ -1,57 +1,85 @@
-import TelegramBot from "node-telegram-bot-api";
-import dotenv from "dotenv";
-import fetch from "node-fetch";
-import fs from "fs";
+require("dotenv").config();
+const TelegramBot = require("node-telegram-bot-api");
+const fetch = require("node-fetch");
+const express = require("express");
 
-dotenv.config();
+const app = express();
+const PORT = process.env.PORT || 3000;
 
-const bot = new TelegramBot(process.env.TELEGRAM_TOKEN, { polling: true });
+// Variáveis de ambiente
+const TELEGRAM_TOKEN = process.env.TELEGRAM_BOT_TOKEN;
+const ELEVENLABS_API_KEY = process.env.ELEVENLABS_API_KEY;
+const ELEVENLABS_AGENT_ID = process.env.ELEVENLABS_AGENT_ID;
+const ELEVENLABS_VOICE_ID = process.env.ELEVENLABS_VOICE_ID;
+
+if (!TELEGRAM_TOKEN || !ELEVENLABS_API_KEY || !ELEVENLABS_AGENT_ID) {
+  console.error("❌ Variáveis de ambiente faltando!");
+  process.exit(1);
+}
+
+// Inicia o bot
+const bot = new TelegramBot(TELEGRAM_TOKEN, { polling: true });
 
 bot.on("message", async (msg) => {
   const chatId = msg.chat.id;
-  const text = msg.text;
+  const userMessage = msg.text;
 
-  if (!text) return;
+  console.log(📩 Mensagem recebida: ${userMessage});
 
   try {
-    // 1. Enviar mensagem para o agente da ElevenLabs
+    // 1. Envia para o Agente da ElevenLabs
     const response = await fetch(
-      https://api.elevenlabs.io/v1/convai/conversation,
+      https://api.elevenlabs.io/v1/convai/conversation/${ELEVENLABS_AGENT_ID}/message,
       {
         method: "POST",
         headers: {
-          "xi-api-key": process.env.ELEVENLABS_API_KEY,
+          "xi-api-key": ELEVENLABS_API_KEY,
           "Content-Type": "application/json",
         },
-        body: JSON.stringify({
-          agent_id: process.env.ELEVENLABS_AGENT_ID,
-          text: text,
-        }),
+        body: JSON.stringify({ text: userMessage }),
       }
     );
 
     const data = await response.json();
+    const agentReply = data?.output?.[0]?.content?.[0]?.text || "Não consegui entender.";
 
-    if (!data || !data.audio_url) {
-      await bot.sendMessage(chatId, "⚠ Não consegui resposta da Aurora.");
-      return;
-    }
+    console.log("🤖 Resposta do agente:", agentReply);
 
-    // 2. Baixar o áudio da ElevenLabs
-    const audioResp = await fetch(data.audio_url);
-    const audioBuffer = await audioResp.buffer();
+    // 2. Converte texto em áudio com TTS da ElevenLabs
+    const ttsResponse = await fetch(
+      https://api.elevenlabs.io/v1/text-to-speech/${ELEVENLABS_VOICE_ID},
+      {
+        method: "POST",
+        headers: {
+          "xi-api-key": ELEVENLABS_API_KEY,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          text: agentReply,
+          voice_settings: { stability: 0.5, similarity_boost: 0.8 },
+        }),
+      }
+    );
 
-    // 3. Salvar em arquivo temporário
-    const filePath = "reply.ogg";
-    fs.writeFileSync(filePath, audioBuffer);
+    const audioBuffer = await ttsResponse.arrayBuffer();
 
-    // 4. Enviar áudio para o Telegram
-    await bot.sendVoice(chatId, filePath);
+    // 3. Manda áudio pro usuário
+    await bot.sendVoice(chatId, Buffer.from(audioBuffer), {}, {
+      filename: "resposta.ogg",
+      contentType: "audio/ogg",
+    });
 
-    // 5. Apagar o arquivo depois de enviar
-    fs.unlinkSync(filePath);
   } catch (err) {
-    console.error("Erro ao falar com ElevenLabs:", err);
-    await bot.sendMessage(chatId, "⚠ Não consegui falar com a Aurora agora.");
+    console.error("❌ Erro:", err);
+    bot.sendMessage(chatId, "⚠ Ocorreu um erro, tente novamente.");
   }
+});
+
+// Rota do Express para manter Railway vivo
+app.get("/", (req, res) => {
+  res.send("🤖 Bot do Telegram + ElevenLabs rodando no Railway!");
+});
+
+app.listen(PORT, () => {
+  console.log(🚀 Servidor online na porta ${PORT});
 });
