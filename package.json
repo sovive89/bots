@@ -1,5 +1,5 @@
 {
-  "name": "parlamentar-bot",
+  "name": "telegram-elevenlabs-bot",
   "version": "1.0.0",
   "main": "index.js",
   "type": "module",
@@ -7,7 +7,7 @@
     "start": "node index.js"
   },
   "dependencies": {
-    "dotenv": "^16.0.3",
+    "dotenv": "^16.4.5",
     "node-fetch": "^3.3.2",
     "node-telegram-bot-api": "^0.66.0"
   }
