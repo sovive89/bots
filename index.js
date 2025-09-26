@@ -38,7 +38,7 @@ bot.on("message", async (msg) => {
     }
 
     const data = await response.json();
-    const reply = data.output?.[0]?.content?.[0]?.text || "🤷 Não consegui entender.";
+    const reply = data.output[0]?.content[0]?.text || "Não consegui entender.";
 
     console.log(🤖 Resposta do Agente: ${reply});
 
@@ -46,7 +46,7 @@ bot.on("message", async (msg) => {
     await bot.sendMessage(chatId, reply);
   } catch (error) {
     console.error("❌ Erro:", error);
-    await bot.sendMessage(chatId, "⚠ Ocorreu um erro ao falar com a IA.");
+    await bot.sendMessage(chatId, "Ocorreu um erro ao falar com a IA.");
   }
 });
 
